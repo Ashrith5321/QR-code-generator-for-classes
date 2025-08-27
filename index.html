@@ -24,12 +24,12 @@
     h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0.2px; }
     p.lead { margin: 0 0 18px; color: var(--muted); }
     label { display:block; font-weight:600; margin: 16px 0 6px; }
-    input[type="text"], input[type="date"] {
+    input[type="text"], input[type="date"], select{
       width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
       background: var(--soft); color: var(--text); outline: none; font-size: 14px;
     }
     .row { display:flex; flex-wrap:wrap; gap: 14px; align-items: end; }
-    .row > div { flex: 1 1 280px; }
+    .row > div { flex: 1 1 260px; }
     .btns { display:flex; gap: 10px; flex-wrap:wrap; margin-top: 14px; }
     button, .linkbtn {
       appearance: none; border: 1px solid rgba(255,255,255,.18); background: var(--accent);
@@ -40,36 +40,46 @@
     .out { margin-top: 16px; padding: 14px; border-radius:12px; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); }
     .out .url { word-break: break-all; }
     .grid { display:grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
-    @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } }
-    .qrbox { display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.04); border:1px dashed rgba(255,255,255,.2); border-radius:16px; min-height: 320px; position: relative; }
+    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+    .qrbox { display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.04); border:1px dashed rgba(255,255,255,.2); border-radius:16px; min-height: 380px; position: relative; padding:18px; }
+    .qrpad { background:#fff; padding: 20px; border-radius: 12px; }
     .muted { color: var(--muted); font-size: 13px; }
     .pill { display:inline-block; padding:4px 10px; background: rgba(126,224,129,.15); border:1px solid rgba(126,224,129,.5); color:#bdfabc; border-radius:999px; font-weight:700; font-size:12px; }
-    .hint { font-size:12px; color: var(--muted); margin-top:6px; }
     .footer { margin-top: 20px; text-align: center; color: var(--muted); font-size: 12px; }
-    .status { position:absolute; bottom:8px; right:10px; font-size:11px; color: var(--muted); }
+    .status { position:absolute; bottom:8px; right:10px; font-size:11px; color: var(--muted); text-align:right; }
     details.tester { margin-top: 16px; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding: 10px 12px; }
     .pass { color: #b6f7b9; }
     .fail { color: #ffc1c1; }
+    .kpis { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; font-size:12px; color: var(--muted); }
+    .kpis span { background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); padding:4px 8px; border-radius:8px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Attendance Form Link + QR Generator</h1>
-      <p class="lead">Type a <strong>date</strong> → get the <strong>prefilled Google Form link</strong> and a <strong>QR code</strong>. The form base stays the same; only the date prefill changes.</p>
+      <p class="lead">Simpler defaults for reliable scans. The form base stays the same; only the date prefill changes.</p>
 
       <div class="grid">
         <div>
           <label for="base">Form base (everything up to the <code>=</code> before the date)</label>
           <input id="base" type="text" value="https://docs.google.com/forms/d/e/1FAIpQLSeGDbJu1VJqYExaRpTWath_J27f5xcbwzI0yl9WK2oCQAANBQ/viewform?usp=pp_url&entry.1670868703=" />
-          <div class="hint">Keep this unchanged unless your form/entry field changes. We'll append the date as <code>YYYY-MM-DD</code>.</div>
 
           <div class="row">
             <div>
               <label for="date">Date (YYYY-MM-DD)</label>
               <input id="date" type="date" />
             </div>
-            <div style="flex:0 0 auto">
+            <div>
+              <label for="qrsize">QR size</label>
+              <select id="qrsize">
+                <option selected>320</option>
+                <option>360</option>
+                <option>420</option>
+                <option>480</option>
+              </select>
+            </div>
+            <div style="flex:0 0 auto; align-self:flex-end;">
               <button id="generate">Generate</button>
             </div>
           </div>
@@ -80,6 +90,10 @@
               <span class="muted" id="dateshow"></span>
             </div>
             <div class="url" id="url"></div>
+            <div class="kpis">
+              <span id="lenkpi">chars: –</span>
+              <span id="sizekpi">size: –</span>
+            </div>
             <div class="btns">
               <a id="openLink" class="linkbtn" href="#" target="_blank" rel="noopener">Open link</a>
               <button class="secondary" id="copy">Copy link</button>
@@ -93,18 +107,21 @@
           </details>
         </div>
 
-        <div class="qrbox">
-          <div id="qrcode"></div>
+        <div class="qrbox" id="qrbox">
+          <div class="qrpad" id="qrpad"><div id="qrcode"></div></div>
           <div class="status" id="qr-status"></div>
         </div>
       </div>
 
-      <div class="footer">Tip: change the base once and it will be remembered on this device. Works great on GitHub Pages.</div>
+      <div class="footer">Change the base once and it will be remembered on this device. Works great on GitHub Pages.</div>
     </div>
   </div>
 
   <script>
     (function(){
+      const DEFAULT_QZ = 20;        // keep a healthy quiet zone for scanning
+      const DEFAULT_ECC = 'L';      // lightest error correction = least dense
+
       const $ = (sel) => document.querySelector(sel);
       const baseEl = $('#base');
       const dateEl = $('#date');
@@ -114,10 +131,14 @@
       const copyBtn = $('#copy');
       const downloadBtn = $('#download');
       const qrcodeWrap = $('#qrcode');
+      const qrPad = $('#qrpad');
       const statusEl = $('#qr-status');
       const dowEl = $('#dow');
       const dateShow = $('#dateshow');
       const testResults = $('#test-results');
+      const lenKPI = $('#lenkpi');
+      const sizeKPI = $('#sizekpi');
+      const sizeSel = $('#qrsize');
 
       const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -154,15 +175,21 @@
 
       function normalizeBase(base){
         base = (base||'').trim();
-        // If no entry param provided, keep usp=pp_url (if present) then append the entry id we use
+        // Always strip usp=pp_url to shorten the URL (makes the QR less dense)
+        base = base.replace(/[?&]usp=pp_url&?/,'?');
+        // If that left a trailing '?', remove it
+        base = base.replace(/\?$/,'');
+        // Ensure we have entry param
         if (!/entry\.\d+=?$/.test(base)) {
+          const sep = base.includes('?') ? '&' : '?';
           if (!base.includes('entry.')) {
-            const head = base.replace(/([?&]usp=pp_url).*/, '$1');
-            base = head + (head.includes('?') ? '&' : '?') + 'entry.1670868703=';
+            base = base + sep + 'entry.1670868703=';
           } else if (!/=$/.test(base)) {
             base = base + '=';
           }
         }
+        // Cleanup accidental ?& or &&
+        base = base.replace(/\?&/,'?').replace(/&&/g,'&');
         return base;
       }
 
@@ -173,29 +200,45 @@
         return base + encodeURIComponent(fmtYMD(d));
       }
 
+      function correctLevelFrom(ecc){
+        const map = (window.QRCode && window.QRCode.CorrectLevel) ? window.QRCode.CorrectLevel : {L:1,M:0,Q:3,H:2};
+        return map[ecc] ?? map.L;
+      }
+
       async function drawQR(url, opts={}){
+        const size = parseInt(sizeSel.value,10) || 320;
+        const qz = DEFAULT_QZ;
+        qrPad.style.padding = qz + 'px';
         qrcodeWrap.innerHTML = '';
         const forceImg = !!opts.forceImageFallback;
-        // Try library first unless forced image fallback
+        const ecc = DEFAULT_ECC;
         if (!forceImg) {
           try {
             await loadQRCodeLib();
             statusEl.textContent = 'Rendering (canvas)…';
             new QRCode(qrcodeWrap, {
               text: url,
-              width: 280,
-              height: 280,
-              correctLevel: (window.QRCode && window.QRCode.CorrectLevel && window.QRCode.CorrectLevel.M) || 0
+              width: size,
+              height: size,
+              correctLevel: correctLevelFrom(ecc)
             });
-            return 'canvas';
+            return { mode:'canvas', size };
           } catch(e){ /* fall through to image fallback */ }
         }
         statusEl.textContent = 'Rendering (image fallback)…';
         const img = new Image();
-        img.alt = 'QR code'; img.width = 280; img.height = 280; img.decoding = 'async';
-        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' + encodeURIComponent(url);
+        img.alt = 'QR code'; img.width = size; img.height = size; img.decoding = 'async';
+        const params = new URLSearchParams({
+          size: `${size}x${size}`,
+          data: url,
+          ecc: ecc,
+          margin: String(qz),
+          qzone: String(qz),
+          format: 'png'
+        });
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?' + params.toString();
         qrcodeWrap.appendChild(img);
-        return 'img';
+        return { mode:'img', size };
       }
 
       async function render(opts={}){
@@ -210,16 +253,17 @@
         openLink.href = url;
         out.hidden = false;
 
-        const mode = await drawQR(url, opts);
-        statusEl.textContent = mode === 'canvas' ? 'QR via library' : 'QR via image API';
+        const meta = await drawQR(url, opts);
+        statusEl.textContent = `${meta.mode === 'canvas' ? 'QR via library' : 'QR via image API'}`;
+        lenKPI.textContent = `chars: ${url.length}`;
+        sizeKPI.textContent = `size: ${meta.size}px`;
 
         try { localStorage.setItem('qr_base', baseEl.value.trim()); } catch(e){}
       }
 
       // events
       $('#generate').addEventListener('click', () => render());
-      dateEl.addEventListener('change', () => render());
-      baseEl.addEventListener('change', () => render());
+      ;[dateEl, baseEl, sizeSel].forEach(el => el.addEventListener('change', () => render()));
 
       copyBtn.addEventListener('click', async () => {
         const url = buildUrl();
@@ -245,6 +289,7 @@
         buildUrl,
         render,
         normalizeBase,
+        controls: { sizeSel },
         _els: { qrcodeWrap }
       };
 
@@ -252,6 +297,7 @@
       try { const saved = localStorage.getItem('qr_base'); if(saved) baseEl.value = saved; } catch(e){}
       const today = new Date();
       dateEl.value = fmtYMD(today);
+      sizeSel.value = '320';
       render();
 
       // --- Self-tests ---
@@ -271,16 +317,19 @@
         assert('URL ends with 2025-09-03', /2025-09-03$/.test(u1));
         assert('URL contains entry.1670868703=', u1.includes('entry.1670868703='));
 
-        // Test 2: Missing entry param gets auto-added
+        // Test 2: Missing entry param gets auto-added; usp=pp_url stripped
         const base2 = 'https://docs.google.com/forms/d/e/1FAIpQLSeGDbJu1VJqYExaRpTWath_J27f5xcbwzI0yl9WK2oCQAANBQ/viewform?usp=pp_url';
         __qrApp.setBase(base2); __qrApp.setDate('2025-09-03');
         const u2 = __qrApp.buildUrl();
         assert('Auto-adds entry param when missing', /entry\.1670868703=2025-09-03$/.test(u2));
+        assert('Strips usp=pp_url', !/usp=pp_url/.test(u2));
 
-        // Test 3: QR element appears (force fallback image so this passes even if CDN blocked)
+        // Test 3: QR element appears with fallback and includes size parameter
+        __qrApp.controls.sizeSel.value = '320';
         await __qrApp.render({ forceImageFallback: true });
-        const hasQR = !!__qrApp._els.qrcodeWrap.querySelector('canvas, img');
-        assert('QR element rendered', hasQR);
+        const img = __qrApp._els.qrcodeWrap.querySelector('img');
+        assert('QR image rendered (fallback)', !!img);
+        assert('Fallback includes size', /size=320x320/.test(img.src));
 
         // Restore UI state
         __qrApp.setBase(base1); __qrApp.setDate(new Date().toISOString().slice(0,10));
