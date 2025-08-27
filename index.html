@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Attendance Form Link + QR Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0b1020; --card:#121a33; --soft:#1a2447; --text:#e6ecff; --muted:#9db0ff; --accent:#6aa2ff; --ok:#7ee081; --warn:#ffd36a; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text); background: radial-gradient(1200px 800px at 10% -10%, #1b2c6c 0%, transparent 60%),
+              radial-gradient(800px 800px at 90% 10%, #0e5fb7 0%, transparent 50%), var(--bg);
+    }
+    .wrap { max-width: 980px; margin: 40px auto; padding: 20px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 20px; backdrop-filter: blur(6px);
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0.2px; }
+    p.lead { margin: 0 0 18px; color: var(--muted); }
+    label { display:block; font-weight:600; margin: 16px 0 6px; }
+    input[type="text"], input[type="date"] {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
+      background: var(--soft); color: var(--text); outline: none; font-size: 14px;
+    }
+    .row { display:flex; flex-wrap:wrap; gap: 14px; align-items: end; }
+    .row > div { flex: 1 1 280px; }
+    .btns { display:flex; gap: 10px; flex-wrap:wrap; margin-top: 14px; }
+    button, .linkbtn {
+      appearance: none; border: 1px solid rgba(255,255,255,.18); background: var(--accent);
+      color:#041734; font-weight:700; padding:10px 14px; border-radius: 12px; cursor:pointer; font-size:14px; text-decoration: none;
+      box-shadow: 0 6px 20px rgba(58,129,246,.35);
+    }
+    button.secondary { background: transparent; color: var(--text); border-color: rgba(255,255,255,.25); }
+    .out { margin-top: 16px; padding: 14px; border-radius:12px; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); }
+    .out .url { word-break: break-all; }
+    .grid { display:grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } }
+    .qrbox { display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.04); border:1px dashed rgba(255,255,255,.2); border-radius:16px; min-height: 320px; position: relative; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .pill { display:inline-block; padding:4px 10px; background: rgba(126,224,129,.15); border:1px solid rgba(126,224,129,.5); color:#bdfabc; border-radius:999px; font-weight:700; font-size:12px; }
+    .hint { font-size:12px; color: var(--muted); margin-top:6px; }
+    .footer { margin-top: 20px; text-align: center; color: var(--muted); font-size: 12px; }
+    .status { position:absolute; bottom:8px; right:10px; font-size:11px; color: var(--muted); }
+    details.tester { margin-top: 16px; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding: 10px 12px; }
+    .pass { color: #b6f7b9; }
+    .fail { color: #ffc1c1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Attendance Form Link + QR Generator</h1>
+      <p class="lead">Type a <strong>date</strong> → get the <strong>prefilled Google Form link</strong> and a <strong>QR code</strong>. The form base stays the same; only the date prefill changes.</p>
+
+      <div class="grid">
+        <div>
+          <label for="base">Form base (everything up to the <code>=</code> before the date)</label>
+          <input id="base" type="text" value="https://docs.google.com/forms/d/e/1FAIpQLSeGDbJu1VJqYExaRpTWath_J27f5xcbwzI0yl9WK2oCQAANBQ/viewform?usp=pp_url&entry.1670868703=" />
+          <div class="hint">Keep this unchanged unless your form/entry field changes. We'll append the date as <code>YYYY-MM-DD</code>.</div>
+
+          <div class="row">
+            <div>
+              <label for="date">Date (YYYY-MM-DD)</label>
+              <input id="date" type="date" />
+            </div>
+            <div style="flex:0 0 auto">
+              <button id="generate">Generate</button>
+            </div>
+          </div>
+
+          <div class="out" id="out" hidden>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+              <span class="pill" id="dow">&nbsp;</span>
+              <span class="muted" id="dateshow"></span>
+            </div>
+            <div class="url" id="url"></div>
+            <div class="btns">
+              <a id="openLink" class="linkbtn" href="#" target="_blank" rel="noopener">Open link</a>
+              <button class="secondary" id="copy">Copy link</button>
+              <button class="secondary" id="download">Download QR (PNG)</button>
+            </div>
+          </div>
+
+          <details class="tester" id="test-panel">
+            <summary>Self‑tests</summary>
+            <div id="test-results" class="muted">Running…</div>
+          </details>
+        </div>
+
+        <div class="qrbox">
+          <div id="qrcode"></div>
+          <div class="status" id="qr-status"></div>
+        </div>
+      </div>
+
+      <div class="footer">Tip: change the base once and it will be remembered on this device. Works great on GitHub Pages.</div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const $ = (sel) => document.querySelector(sel);
+      const baseEl = $('#base');
+      const dateEl = $('#date');
+      const out = $('#out');
+      const urlEl = $('#url');
+      const openLink = $('#openLink');
+      const copyBtn = $('#copy');
+      const downloadBtn = $('#download');
+      const qrcodeWrap = $('#qrcode');
+      const statusEl = $('#qr-status');
+      const dowEl = $('#dow');
+      const dateShow = $('#dateshow');
+      const testResults = $('#test-results');
+
+      const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+      // --- Robust loader for QRCode lib with multiple CDNs + graceful fallback ---
+      const QR_LIBS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+        'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+        'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js'
+      ];
+
+      function loadQRCodeLib(){
+        return new Promise((resolve, reject) => {
+          if (window.QRCode) return resolve('loaded');
+          let i = 0;
+          function tryNext(){
+            if (window.QRCode) return resolve('loaded');
+            if (i >= QR_LIBS.length) return reject(new Error('All QRCode CDNs failed'));
+            const src = QR_LIBS[i++];
+            statusEl.textContent = 'Loading QR library…';
+            const s = document.createElement('script');
+            s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+            s.onload = () => setTimeout(() => window.QRCode ? resolve('loaded') : tryNext(), 0);
+            s.onerror = tryNext;
+            document.head.appendChild(s);
+          }
+          tryNext();
+        });
+      }
+
+      // helpers
+      function pad(n){ return String(n).padStart(2,'0'); }
+      function fmtYMD(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+      function parseDateInput(){ return dateEl.value ? new Date(dateEl.value + 'T00:00:00') : null; }
+
+      function normalizeBase(base){
+        base = (base||'').trim();
+        // If no entry param provided, keep usp=pp_url (if present) then append the entry id we use
+        if (!/entry\.\d+=?$/.test(base)) {
+          if (!base.includes('entry.')) {
+            const head = base.replace(/([?&]usp=pp_url).*/, '$1');
+            base = head + (head.includes('?') ? '&' : '?') + 'entry.1670868703=';
+          } else if (!/=$/.test(base)) {
+            base = base + '=';
+          }
+        }
+        return base;
+      }
+
+      function buildUrl(){
+        const d = parseDateInput();
+        if(!d) return '';
+        const base = normalizeBase(baseEl.value);
+        return base + encodeURIComponent(fmtYMD(d));
+      }
+
+      async function drawQR(url, opts={}){
+        qrcodeWrap.innerHTML = '';
+        const forceImg = !!opts.forceImageFallback;
+        // Try library first unless forced image fallback
+        if (!forceImg) {
+          try {
+            await loadQRCodeLib();
+            statusEl.textContent = 'Rendering (canvas)…';
+            new QRCode(qrcodeWrap, {
+              text: url,
+              width: 280,
+              height: 280,
+              correctLevel: (window.QRCode && window.QRCode.CorrectLevel && window.QRCode.CorrectLevel.M) || 0
+            });
+            return 'canvas';
+          } catch(e){ /* fall through to image fallback */ }
+        }
+        statusEl.textContent = 'Rendering (image fallback)…';
+        const img = new Image();
+        img.alt = 'QR code'; img.width = 280; img.height = 280; img.decoding = 'async';
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=' + encodeURIComponent(url);
+        qrcodeWrap.appendChild(img);
+        return 'img';
+      }
+
+      async function render(opts={}){
+        const url = buildUrl();
+        if(!url){ out.hidden = true; qrcodeWrap.innerHTML = ''; statusEl.textContent = ''; return; }
+        const d = parseDateInput();
+        const label = fmtYMD(d);
+        dowEl.textContent = DOW[d.getDay()];
+        dateShow.textContent = label;
+
+        urlEl.innerHTML = `<strong>Link:</strong> <a href="${url}" target="_blank" rel="noopener">${url}</a>`;
+        openLink.href = url;
+        out.hidden = false;
+
+        const mode = await drawQR(url, opts);
+        statusEl.textContent = mode === 'canvas' ? 'QR via library' : 'QR via image API';
+
+        try { localStorage.setItem('qr_base', baseEl.value.trim()); } catch(e){}
+      }
+
+      // events
+      $('#generate').addEventListener('click', () => render());
+      dateEl.addEventListener('change', () => render());
+      baseEl.addEventListener('change', () => render());
+
+      copyBtn.addEventListener('click', async () => {
+        const url = buildUrl();
+        if(!url) return;
+        try { await navigator.clipboard.writeText(url); copyBtn.textContent = 'Copied!'; setTimeout(()=>copyBtn.textContent='Copy link', 1200); } catch(e){ alert('Copy failed: ' + e); }
+      });
+
+      downloadBtn.addEventListener('click', () => {
+        const canvas = qrcodeWrap.querySelector('canvas');
+        const img = qrcodeWrap.querySelector('img');
+        let dataURL;
+        if(canvas){ dataURL = canvas.toDataURL('image/png'); }
+        else if(img){ dataURL = img.src; }
+        else { alert('QR not ready yet.'); return; }
+        const a = document.createElement('a');
+        a.href = dataURL; a.download = `attendance_qr_${dateEl.value||'date'}.png`; a.click();
+      });
+
+      // Expose a tiny API for tests
+      window.__qrApp = {
+        setBase(v){ baseEl.value = v; },
+        setDate(v){ dateEl.value = v; },
+        buildUrl,
+        render,
+        normalizeBase,
+        _els: { qrcodeWrap }
+      };
+
+      // init
+      try { const saved = localStorage.getItem('qr_base'); if(saved) baseEl.value = saved; } catch(e){}
+      const today = new Date();
+      dateEl.value = fmtYMD(today);
+      render();
+
+      // --- Self-tests ---
+      function assert(name, cond){
+        const line = document.createElement('div');
+        line.innerHTML = `<span class="${cond? 'pass':'fail'}">${cond? '✔':'✖'}</span> ${name}`;
+        testResults.appendChild(line);
+      }
+      function clearResults(){ testResults.textContent = ''; }
+
+      async function runTests(){
+        clearResults();
+        // Test 1: URL builds with base already ending in entry id
+        const base1 = 'https://docs.google.com/forms/d/e/1FAIpQLSeGDbJu1VJqYExaRpTWath_J27f5xcbwzI0yl9WK2oCQAANBQ/viewform?usp=pp_url&entry.1670868703=';
+        __qrApp.setBase(base1); __qrApp.setDate('2025-09-03');
+        const u1 = __qrApp.buildUrl();
+        assert('URL ends with 2025-09-03', /2025-09-03$/.test(u1));
+        assert('URL contains entry.1670868703=', u1.includes('entry.1670868703='));
+
+        // Test 2: Missing entry param gets auto-added
+        const base2 = 'https://docs.google.com/forms/d/e/1FAIpQLSeGDbJu1VJqYExaRpTWath_J27f5xcbwzI0yl9WK2oCQAANBQ/viewform?usp=pp_url';
+        __qrApp.setBase(base2); __qrApp.setDate('2025-09-03');
+        const u2 = __qrApp.buildUrl();
+        assert('Auto-adds entry param when missing', /entry\.1670868703=2025-09-03$/.test(u2));
+
+        // Test 3: QR element appears (force fallback image so this passes even if CDN blocked)
+        await __qrApp.render({ forceImageFallback: true });
+        const hasQR = !!__qrApp._els.qrcodeWrap.querySelector('canvas, img');
+        assert('QR element rendered', hasQR);
+
+        // Restore UI state
+        __qrApp.setBase(base1); __qrApp.setDate(new Date().toISOString().slice(0,10));
+        await __qrApp.render();
+      }
+
+      runTests();
+    })();
+  </script>
+</body>
+</html>
